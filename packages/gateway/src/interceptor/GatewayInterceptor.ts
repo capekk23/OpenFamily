@@ -1,8 +1,10 @@
 import { PrismaClient } from '@prisma/client';
+import { Queue } from 'bullmq';
 import { PolicyChecker } from './PolicyChecker.js';
 import { SupervisorClient } from './SupervisorClient.js';
 import { ApprovalWaiter } from './ApprovalWaiter.js';
 import { PolicyRules } from '@openfamily/policy-engine';
+import { ApprovalTimeoutJobData, scheduleApprovalTimeout } from '../jobs/approvalTimeout.job.js';
 
 export interface InterceptRequest {
   sessionId: string;
@@ -26,7 +28,8 @@ export class GatewayInterceptor {
     private readonly prisma: PrismaClient,
     private readonly policyChecker: PolicyChecker,
     private readonly supervisorClient: SupervisorClient,
-    private readonly approvalWaiter: ApprovalWaiter
+    private readonly approvalWaiter: ApprovalWaiter,
+    private readonly timeoutQueue: Queue<ApprovalTimeoutJobData>
   ) {}
 
   async intercept(req: InterceptRequest): Promise<InterceptOutcome> {
@@ -111,6 +114,15 @@ export class GatewayInterceptor {
         expiresAt,
       },
     });
+
+    // Schedule BullMQ job for full-timeout sweep (in case HTTP connection drops before 30s)
+    await scheduleApprovalTimeout(
+      this.timeoutQueue,
+      approval.id,
+      event.id,
+      timeoutSeconds,
+      timeoutBehavior
+    );
 
     const resolution = await this.approvalWaiter.wait(
       approval.id,
