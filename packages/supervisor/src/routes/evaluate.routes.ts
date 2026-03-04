@@ -21,7 +21,14 @@ export function createEvaluateRouter(agent: SupervisorAgent): Router {
       return;
     }
 
-    const result = await agent.evaluate(parsed.data);
+    const result = await agent.evaluate({
+      toolName: parsed.data.toolName,
+      toolInput: parsed.data.toolInput,
+      sessionId: parsed.data.sessionId,
+      policyId: parsed.data.policyId,
+      spentBudget: parsed.data.spentBudget,
+      policyRules: parsed.data.policyRules,
+    });
     res.json(result);
   });
 

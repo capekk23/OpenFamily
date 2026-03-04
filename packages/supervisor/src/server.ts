@@ -1,11 +1,11 @@
-import express from 'express';
+import express, { Express } from 'express';
 import { SupervisorAgent } from './agent/SupervisorAgent.js';
 import { createEvaluateRouter } from './routes/evaluate.routes.js';
 
 const PORT = Number(process.env.SUPERVISOR_PORT ?? 3003);
 
 const agent = new SupervisorAgent();
-const app = express();
+const app: Express = express();
 app.use(express.json());
 
 // Internal-only — no auth middleware (network-level isolation in production)
