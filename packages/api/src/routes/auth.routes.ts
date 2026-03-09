@@ -62,5 +62,34 @@ export function createAuthRouter(prisma: PrismaClient): Router {
     res.json({ ok: true });
   });
 
+  // POST /api/auth/setup — first-run admin creation (only when no admin exists)
+  router.post('/setup', async (req, res) => {
+    const adminCount = await prisma.user.count({ where: { role: 'ADMIN' } });
+    if (adminCount > 0) {
+      res.status(403).json({ error: 'Setup already complete' });
+      return;
+    }
+    const schema = z.object({ email: z.string().email(), password: z.string().min(8) });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.flatten() });
+      return;
+    }
+    const passwordHash = await bcrypt.hash(parsed.data.password, 10);
+    const user = await prisma.user.create({
+      data: { email: parsed.data.email, passwordHash, role: 'ADMIN' },
+    });
+    const payload = { userId: user.id, email: user.email, role: user.role };
+    const accessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: '15m' });
+    const refreshToken = jwt.sign(payload, JWT_REFRESH_SECRET, { expiresIn: '7d' });
+    res.status(201).json({ accessToken, refreshToken, user: payload });
+  });
+
+  // GET /api/auth/setup-status — public endpoint to check if setup is needed
+  router.get('/setup-status', async (_req, res) => {
+    const adminCount = await prisma.user.count({ where: { role: 'ADMIN' } });
+    res.json({ needsSetup: adminCount === 0 });
+  });
+
   return router;
 }

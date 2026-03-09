@@ -91,6 +91,15 @@ model User {
   createdAt    DateTime @default(now())
 }
 
+// Key-value store for system configuration (provider API keys, etc.)
+// Sensitive values are AES-256-GCM encrypted before storage
+model Setting {
+  key       String   @id  // e.g. "provider.anthropic", "provider.openrouter"
+  value     String       // JSON string, encrypted if sensitive
+  encrypted Boolean  @default(false)
+  updatedAt DateTime @updatedAt
+}
+
 enum SessionStatus {
   ACTIVE
   TERMINATED

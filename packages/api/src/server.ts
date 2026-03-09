@@ -8,6 +8,7 @@ import { createApprovalsRouter } from './routes/approvals.routes.js';
 import { createSessionsRouter } from './routes/sessions.routes.js';
 import { createKeysRouter } from './routes/keys.routes.js';
 import { createDashboardRouter } from './routes/dashboard.routes.js';
+import { createSettingsRouter } from './routes/settings.routes.js';
 import { createApprovalStreamHandler } from './sse/approvalStream.js';
 import { requireAuth } from './middleware/auth.middleware.js';
 
@@ -37,6 +38,7 @@ app.use('/api/approvals', createApprovalsRouter(prisma, redis));
 app.use('/api/sessions', createSessionsRouter(prisma));
 app.use('/api/keys', createKeysRouter(prisma));
 app.use('/api/dashboard', createDashboardRouter(prisma));
+app.use('/api/settings', createSettingsRouter(prisma));
 
 // SSE stream
 app.get('/api/approvals/stream', requireAuth, createApprovalStreamHandler(redis));

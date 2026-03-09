@@ -35,6 +35,7 @@ export default function NavBar() {
         { href: '/activity', label: 'Activity' },
         { href: '/policies', label: 'Policies' },
         { href: '/keys', label: 'API Keys' },
+        { href: '/settings', label: 'Settings' },
       ].map(({ href, label }) => (
         <Link key={href} href={href} style={{ color: 'rgba(255,255,255,0.75)', textDecoration: 'none', fontSize: '0.9rem' }}>
           {label}
