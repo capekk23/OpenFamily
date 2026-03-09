@@ -114,3 +114,82 @@ jobs:
       - run: pnpm --filter @openfamily/supervisor build
       - run: pnpm --filter @openfamily/gateway build
       - run: pnpm --filter @openfamily/api build
+
+  e2e:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    needs: [build]
+    env:
+      DATABASE_URL: postgresql://openfamily:openfamily@localhost:5432/openfamily
+      REDIS_URL: redis://localhost:6379
+      JWT_SECRET: test-secret-e2e
+      JWT_REFRESH_SECRET: test-refresh-secret-e2e
+      SETTINGS_ENCRYPTION_KEY: test-encryption-key-32-chars-e2e
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      GATEWAY_URL: http://localhost:3001
+      API_URL: http://localhost:3002
+      SUPERVISOR_URL: http://localhost:3003
+      DASHBOARD_URL: http://localhost:3000
+      NEXT_PUBLIC_API_URL: http://localhost:3002
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # Start infrastructure
+      - name: Start Postgres + Redis
+        run: docker compose up postgres redis -d
+
+      - name: Wait for infra
+        run: |
+          timeout 30 bash -c 'until docker compose exec -T postgres pg_isready -U openfamily; do sleep 1; done'
+          timeout 30 bash -c 'until docker compose exec -T redis redis-cli ping; do sleep 1; done'
+
+      - name: Run DB migration
+        run: pnpm db:migrate
+
+      # Build all services
+      - run: pnpm --filter @openfamily/policy-engine build
+      - run: pnpm --filter @openfamily/gateway build
+      - run: pnpm --filter @openfamily/api build
+      - run: pnpm --filter @openfamily/supervisor build
+      - run: pnpm --filter @openfamily/dashboard build
+
+      # Start services as background processes
+      - name: Start backend services
+        run: |
+          pnpm --filter @openfamily/gateway start &
+          pnpm --filter @openfamily/api start &
+          pnpm --filter @openfamily/supervisor start &
+          pnpm --filter @openfamily/dashboard start &
+
+      # Install Playwright browsers
+      - name: Install Playwright browsers
+        run: pnpm --filter @openfamily/e2e-tests install-browsers
+
+      # Wait for all services to be ready
+      - name: Wait for services
+        run: |
+          timeout 60 bash -c 'until curl -sf http://localhost:3001/health; do sleep 1; done'
+          timeout 60 bash -c 'until curl -sf http://localhost:3002/health; do sleep 1; done'
+          timeout 90 bash -c 'until curl -sf http://localhost:3000; do sleep 2; done'
+
+      # Run E2E tests
+      - name: Run E2E tests
+        run: pnpm --filter @openfamily/e2e-tests test
+        env:
+          E2E_RESET: 'true'
+
+      # Upload artifacts on failure
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: tests/e2e/playwright-report/
+          retention-days: 7
