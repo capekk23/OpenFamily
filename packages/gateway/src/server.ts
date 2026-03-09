@@ -1,6 +1,10 @@
-import express from 'express';
+import express, { Express } from 'express';
+import pinoHttp from 'pino-http';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import { PrismaClient } from '@prisma/client';
 import Redis from 'ioredis';
+import { logger } from './logger.js';
 import { PolicyChecker } from './interceptor/PolicyChecker.js';
 import { SupervisorClient } from './interceptor/SupervisorClient.js';
 import { ApprovalWaiter } from './interceptor/ApprovalWaiter.js';
@@ -34,19 +38,41 @@ const interceptor = new GatewayInterceptor(
   timeoutQueue
 );
 
-const app = express();
-app.use(express.json());
+const app: Express = express();
+
+// Security headers (no CSP needed — agent-facing API, not browser)
+app.use(helmet({ contentSecurityPolicy: false }));
+
+app.use(pinoHttp({
+  logger,
+  autoLogging: { ignore: (req) => req.url === '/health' },
+}));
+app.use(express.json({ limit: '512kb' }));
+
+// Rate limiting — 600 intercept calls per minute per IP (agents may be fast)
+const interceptLimiter = rateLimit({
+  windowMs: 60_000,
+  max: 600,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => {
+    // Rate limit by API key header if present, else IP
+    return String(req.headers['x-openfamily-key'] ?? req.ip ?? 'unknown');
+  },
+  message: { error: 'Rate limit exceeded' },
+});
 
 app.get('/health', (_req, res) => res.json({ status: 'ok', service: 'gateway' }));
 
-app.use('/v1', createInterceptRouter(prisma, interceptor));
+app.use('/v1', interceptLimiter, createInterceptRouter(prisma, interceptor));
 
 const server = app.listen(PORT, () => {
-  console.log(`Gateway listening on port ${PORT}`);
+  logger.info({ port: PORT }, 'Gateway listening');
 });
 
 // Graceful shutdown
 const shutdown = async () => {
+  logger.info('Shutting down gateway…');
   server.close();
   await timeoutWorker.close();
   await timeoutQueue.close();

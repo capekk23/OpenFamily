@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { SYSTEM_PROMPT, buildEvaluationPrompt } from './prompts/system.prompt.js';
+import { logger } from '../logger.js';
 
 export type SupervisorDecision = 'APPROVE' | 'DENY' | 'ESCALATE_HUMAN';
 
@@ -63,6 +64,8 @@ export class SupervisorAgent {
   }
 
   async evaluate(req: EvaluateRequest): Promise<SupervisorResult> {
+    const log = logger.child({ sessionId: req.sessionId, toolName: req.toolName });
+    log.info('supervisor evaluating tool call');
     const prompt = buildEvaluationPrompt(req);
 
     const response = await this.client.messages.create({
@@ -85,6 +88,7 @@ export class SupervisorAgent {
     }
 
     const input = toolUse.input as { reason: string; notes?: string };
+    log.info({ decision: toolUse.name, reason: input.reason }, 'supervisor decision');
 
     switch (toolUse.name) {
       case 'approve_action':

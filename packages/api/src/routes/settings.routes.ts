@@ -38,7 +38,7 @@ export function createSettingsRouter(prisma: PrismaClient): Router {
       return;
     }
 
-    const providerId = req.params.provider;
+    const providerId = String(req.params.provider);
     const key = `provider.${providerId}`;
 
     // Merge with existing config (so partial updates work)
@@ -70,7 +70,7 @@ export function createSettingsRouter(prisma: PrismaClient): Router {
 
   // DELETE /api/settings/providers/:provider (admin only)
   router.delete('/providers/:provider', requireRole('ADMIN'), async (req, res) => {
-    const key = `provider.${req.params.provider}`;
+    const key = `provider.${String(req.params.provider)}`;
     await prisma.setting.deleteMany({ where: { key } });
     res.json({ ok: true });
   });

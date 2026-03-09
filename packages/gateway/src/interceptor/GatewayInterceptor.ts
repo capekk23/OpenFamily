@@ -5,6 +5,7 @@ import { SupervisorClient } from './SupervisorClient.js';
 import { ApprovalWaiter } from './ApprovalWaiter.js';
 import { PolicyRules } from '@openfamily/policy-engine';
 import { ApprovalTimeoutJobData, scheduleApprovalTimeout } from '../jobs/approvalTimeout.job.js';
+import { logger } from '../logger.js';
 
 export interface InterceptRequest {
   sessionId: string;
@@ -43,25 +44,32 @@ export class GatewayInterceptor {
       policy: req.policy,
     });
 
+    const log = logger.child({ sessionId: req.sessionId, toolName: req.toolName });
+
     if (evalResult.verdict === 'BLOCK') {
+      log.info({ decision: 'BLOCKED', reason: evalResult.reason }, 'tool call blocked');
       await this.writeEvent(req, 'BLOCKED', evalResult.reason);
       return { allowed: false, decision: 'BLOCKED', reason: evalResult.reason };
     }
 
     if (evalResult.verdict === 'APPROVE') {
+      log.info({ decision: 'APPROVED' }, 'tool call approved');
       await this.writeEvent(req, 'APPROVED', evalResult.reason);
       return { allowed: true, decision: 'APPROVED', reason: evalResult.reason };
     }
 
     if (evalResult.verdict === 'SUPERVISOR') {
+      log.info('routing to supervisor');
       return this.handleSupervisor(req, evalResult.reason);
     }
 
+    log.info('routing to human approval');
     // HUMAN_APPROVAL
     return this.handleHumanApproval(req, evalResult.reason);
   }
 
   private async handleSupervisor(req: InterceptRequest, reason: string): Promise<InterceptOutcome> {
+    const log = logger.child({ sessionId: req.sessionId, toolName: req.toolName });
     const supervisorResult = await this.supervisorClient.evaluate({
       toolName: req.toolName,
       toolInput: req.toolInput,
@@ -71,6 +79,7 @@ export class GatewayInterceptor {
       policyRules: req.policy,
     });
 
+    log.info({ supervisorDecision: supervisorResult.decision }, 'supervisor evaluated');
     if (supervisorResult.decision === 'APPROVE') {
       await this.writeEvent(req, 'APPROVED_BY_SUPERVISOR', reason, true, supervisorResult.notes);
       return {
@@ -166,7 +175,7 @@ export class GatewayInterceptor {
         sessionId: req.sessionId,
         policyId: req.policyId,
         toolName: req.toolName,
-        toolInput: req.toolInput,
+        toolInput: req.toolInput as never,
         decision: decision as never,
         reason,
         estimatedCost: req.estimatedCost,

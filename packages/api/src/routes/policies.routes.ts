@@ -50,7 +50,7 @@ export function createPoliciesRouter(prisma: PrismaClient): Router {
 
   router.get('/:id', async (req, res) => {
     const policy = await prisma.policy.findUnique({
-      where: { id: req.params.id },
+      where: { id: String(req.params.id) },
     });
     if (!policy) {
       res.status(404).json({ error: 'Policy not found' });
@@ -66,14 +66,14 @@ export function createPoliciesRouter(prisma: PrismaClient): Router {
       return;
     }
 
-    const existing = await prisma.policy.findUnique({ where: { id: req.params.id } });
+    const existing = await prisma.policy.findUnique({ where: { id: String(req.params.id) } });
     if (!existing) {
       res.status(404).json({ error: 'Policy not found' });
       return;
     }
 
     const policy = await prisma.policy.update({
-      where: { id: req.params.id },
+      where: { id: String(req.params.id) },
       data: {
         ...(parsed.data.name && { name: parsed.data.name }),
         ...(parsed.data.rules && { rules: parsed.data.rules }),
@@ -85,13 +85,13 @@ export function createPoliciesRouter(prisma: PrismaClient): Router {
   });
 
   router.delete('/:id', requireRole('ADMIN'), async (req, res) => {
-    const existing = await prisma.policy.findUnique({ where: { id: req.params.id } });
+    const existing = await prisma.policy.findUnique({ where: { id: String(req.params.id) } });
     if (!existing) {
       res.status(404).json({ error: 'Policy not found' });
       return;
     }
     await prisma.policy.update({
-      where: { id: req.params.id },
+      where: { id: String(req.params.id) },
       data: { isActive: false },
     });
     res.json({ ok: true });

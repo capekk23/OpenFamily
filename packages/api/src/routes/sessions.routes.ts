@@ -52,7 +52,7 @@ export function createSessionsRouter(prisma: PrismaClient): Router {
 
   router.post('/:id/terminate', requireRole('ADMIN', 'REVIEWER'), async (req, res) => {
     const session = await prisma.agentSession.findUnique({
-      where: { id: req.params.id },
+      where: { id: String(req.params.id) },
     });
     if (!session) {
       res.status(404).json({ error: 'Session not found' });
@@ -60,7 +60,7 @@ export function createSessionsRouter(prisma: PrismaClient): Router {
     }
 
     await prisma.agentSession.update({
-      where: { id: req.params.id },
+      where: { id: String(req.params.id) },
       data: { status: 'TERMINATED', endedAt: new Date() },
     });
 

@@ -91,7 +91,7 @@ export function createInterceptRouter(
   // GET /v1/sessions/:sessionId/status
   router.get('/sessions/:sessionId/status', auth, async (req, res) => {
     const session = await prisma.agentSession.findUnique({
-      where: { id: req.params.sessionId },
+      where: { id: String(req.params.sessionId) },
       select: {
         id: true,
         agentId: true,

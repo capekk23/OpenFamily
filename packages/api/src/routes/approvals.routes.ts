@@ -57,7 +57,7 @@ export function createApprovalsRouter(prisma: PrismaClient, redis: Redis): Route
     }
 
     const approval = await prisma.approvalRequest.findUnique({
-      where: { id: req.params.id, status: 'PENDING' },
+      where: { id: String(req.params.id), status: 'PENDING' },
     });
     if (!approval) {
       res.status(404).json({ error: 'Approval not found or already resolved' });
@@ -65,7 +65,7 @@ export function createApprovalsRouter(prisma: PrismaClient, redis: Redis): Route
     }
 
     await prisma.approvalRequest.update({
-      where: { id: req.params.id },
+      where: { id: String(req.params.id) },
       data: {
         status: 'APPROVED',
         resolvedBy: req.user!.userId,
@@ -73,7 +73,7 @@ export function createApprovalsRouter(prisma: PrismaClient, redis: Redis): Route
       },
     });
 
-    await publishResolution(redis, req.params.id, 'APPROVED_BY_HUMAN', parsed.data.reviewNote, req.user!.userId);
+    await publishResolution(redis, String(req.params.id), 'APPROVED_BY_HUMAN', parsed.data.reviewNote, req.user!.userId);
 
     res.json({ ok: true });
   });
@@ -86,7 +86,7 @@ export function createApprovalsRouter(prisma: PrismaClient, redis: Redis): Route
     }
 
     const approval = await prisma.approvalRequest.findUnique({
-      where: { id: req.params.id, status: 'PENDING' },
+      where: { id: String(req.params.id), status: 'PENDING' },
     });
     if (!approval) {
       res.status(404).json({ error: 'Approval not found or already resolved' });
@@ -94,7 +94,7 @@ export function createApprovalsRouter(prisma: PrismaClient, redis: Redis): Route
     }
 
     await prisma.approvalRequest.update({
-      where: { id: req.params.id },
+      where: { id: String(req.params.id) },
       data: {
         status: 'DENIED',
         resolvedBy: req.user!.userId,
@@ -102,7 +102,7 @@ export function createApprovalsRouter(prisma: PrismaClient, redis: Redis): Route
       },
     });
 
-    await publishResolution(redis, req.params.id, 'DENIED_BY_HUMAN', parsed.data.reviewNote, req.user!.userId);
+    await publishResolution(redis, String(req.params.id), 'DENIED_BY_HUMAN', parsed.data.reviewNote, req.user!.userId);
 
     res.json({ ok: true });
   });

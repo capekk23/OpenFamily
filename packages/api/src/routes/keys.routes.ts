@@ -61,13 +61,13 @@ export function createKeysRouter(prisma: PrismaClient): Router {
   });
 
   router.delete('/:id', async (req, res) => {
-    const key = await prisma.apiKey.findUnique({ where: { id: req.params.id } });
+    const key = await prisma.apiKey.findUnique({ where: { id: String(req.params.id) } });
     if (!key) {
       res.status(404).json({ error: 'API key not found' });
       return;
     }
     await prisma.apiKey.update({
-      where: { id: req.params.id },
+      where: { id: String(req.params.id) },
       data: { isActive: false },
     });
     res.json({ ok: true });
